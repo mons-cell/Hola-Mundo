@@ -9,8 +9,18 @@ import { Sparkles, Globe, RefreshCcw, Github, Info, Languages, MessageSquare, Ca
 import { GoogleGenAI } from "@google/genai";
 import Markdown from 'react-markdown';
 
-// Initialize Gemini API
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+// Lazy initialize Gemini API to handle missing keys gracefully in production
+let aiInstance: GoogleGenAI | null = null;
+function getAi() {
+  if (!aiInstance) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
+      throw new Error("GEMINI_API_KEY no configurada. Por favor, añádela en la configuración del proyecto.");
+    }
+    aiInstance = new GoogleGenAI({ apiKey });
+  }
+  return aiInstance;
+}
 
 const LANGUAGES = [
   { code: 'es', name: 'Español', greeting: 'Hola Mundo' },
@@ -77,6 +87,7 @@ export default function App() {
     setAiMessage(null);
     const langName = selectedAiLang === 'es' ? 'Español' : 'Italiano';
     try {
+      const ai = getAi();
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: `Genera un saludo de "Hola Mundo" creativo y original en idioma ${langName} y en el estilo: ${selectedStyle}. Debe ser breve pero impactante. No uses negritas excesivas.`,
@@ -84,7 +95,8 @@ export default function App() {
       setAiMessage(response.text || "No se pudo generar el mensaje.");
     } catch (error) {
       console.error(error);
-      setAiMessage("Error al conectar con la IA. Verifica tu configuración.");
+      const errorMessage = error instanceof Error ? error.message : "Error al conectar con la IA.";
+      setAiMessage(errorMessage);
     } finally {
       setIsAiLoading(false);
     }
